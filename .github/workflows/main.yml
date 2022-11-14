@@ -91,8 +91,7 @@ jobs:
       - name: Run phpcs
         working-directory: ./morcado/
         run: | 
-          phpcs --standard=PSR12 -q --report=checkstyle admin/controllers/ | cs2pr
-          phpcs --standard=PSR12 -q --report=checkstyle admin/components/ | cs2pr
+          phpcs --standard=admin/phpcs.xml -q --report=checkstyle | cs2pr
         
   all_tests:
     name: Tests For All Versions Successful
