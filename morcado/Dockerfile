@@ -1,0 +1,71 @@
+#
+# PHP Dependencies
+#
+FROM composer as vendor
+COPY ./composer.json ./
+COPY ./composer.lock ./
+RUN composer install \
+    --ignore-platform-reqs \
+    --no-interaction \
+    --no-plugins \
+    --no-scripts \
+    --prefer-dist
+
+#
+# Frontend React
+#
+FROM node:16-alpine as frontend
+WORKDIR /app
+COPY ./package.json ./
+COPY ./package-lock.json ./
+COPY ./webpack.mix.js ./
+COPY ./mix-manifest.json ./
+COPY ./admin_ui/ ./admin_ui/
+RUN npm install && npm run dev
+
+#
+# Morcado
+#
+FROM php:8.1-fpm
+
+ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/install-php-extensions && \
+    apt-get update && apt-get install -y \
+		libfreetype6-dev \
+		libjpeg62-turbo-dev \
+		libpng-dev \
+	&& docker-php-ext-configure gd --with-freetype --with-jpeg \
+	&& docker-php-ext-install -j$(nproc) gd
+
+RUN install-php-extensions \
+        decimal \
+        intl \
+        opcache \
+        pdo_mysql \
+        pdo_pgsql \
+        redis \
+        zip
+
+RUN pecl install xdebug
+RUN docker-php-ext-enable xdebug
+COPY custom.php.ini /usr/local/etc/php/conf.d/custom.php.ini
+
+RUN apt update && \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+        apt-get install -y nodejs
+
+WORKDIR /var/www/html
+
+COPY ./public/ ./public/
+COPY --from=vendor /app/vendor/ ./vendor/
+COPY --from=frontend /app/node_modules ./node_modules
+COPY --from=frontend /app/public/assets/inertia/ ./public/assets/inertia
+COPY --from=frontend /app/package.json ./package.json
+COPY --from=frontend /app/package-lock.json ./package-lock.json
+COPY --from=frontend /app/mix-manifest.json ./mix-manifest.json
+COPY --from=frontend /app/webpack.mix.js ./webpack.mix.js
+
+RUN chown -R www-data:www-data /var/www/html/mix-manifest.json
+
+CMD ["/bin/bash", "-c", "npm run production || true; php-fpm"]

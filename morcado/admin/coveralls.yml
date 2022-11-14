@@ -1,0 +1,2 @@
+coverage_clover: ./admin/tests/_output/coverage.xml
+json_path: ./admin/tests/_output/coveralls-upload.json

@@ -1,0 +1,55 @@
+version: '3'
+
+name: morcado
+
+networks:
+  traefik:
+    external: true
+  dbaas:
+    external: true
+
+services:
+  morcado:
+    build:
+      context: ./morcado
+      dockerfile: Dockerfile.dev
+    container_name: morcado-dev-php
+    image: morcado/morcado
+    environment:
+      # Doppler Secrets
+      - DB_HOST
+      - DB_PORT
+      - DB_DATABASE
+      - DB_USER
+      - DB_PASSWORD
+      - MS_AUTH_CLIENT_ID
+      - MS_AUTH_CLIENT_SECRET
+      - MS_AUTH_TENANT_ID
+    volumes:
+      - ./morcado/admin:/var/www/html/admin
+      - ./morcado/console:/var/www/html/console
+      - ./morcado/admin_ui:/var/www/html/admin_ui
+      - ./morcado/public:/var/www/html/public
+    networks:
+      - dbaas
+      - traefik
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.dev
+    container_name: morcado-dev-nginx
+    volumes:
+      - ./morcado/public:/var/www/html/public
+    networks:
+      - dbaas
+      - traefik
+    ports:
+      - 8100:80
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx.rule=Host(`morcado.tnmdev.com`)"
+      - "traefik.http.routers.nginx.entrypoints=websecure"
+      - "traefik.http.routers.nginx.tls=true"
+      - "traefik.http.services.nginx.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik"
